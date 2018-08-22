@@ -9,7 +9,7 @@ import java.nio.file.Path
 
 class SourceClassLoaderTest {
 
-    private val classResolver = ClassResolver(emptySet(), "")
+    private val classResolver = ClassResolver(emptySet(), Whitelist.MINIMAL, "")
 
     @Test
     fun `can load class from Java's lang package when no files are provided to the class loader`() {

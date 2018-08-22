@@ -1,5 +1,6 @@
 package net.corda.djvm.rewiring
 
+import net.corda.djvm.analysis.AnalysisContext
 import net.corda.djvm.messages.Message
 import net.corda.djvm.messages.MessageCollection
 import net.corda.djvm.references.ClassHierarchy
@@ -9,10 +10,14 @@ import net.corda.djvm.references.ClassHierarchy
  *
  * @property messages A collection of the problem(s) that caused the class loading to fail.
  * @property classes The class hierarchy at the time the exception was raised.
+ * @property context The context in which the analysis took place.
+ * @property classOrigins Map of class origins. The resulting set represents the types referencing the class in question.
  */
 class SandboxClassLoadingException(
-        val messages: MessageCollection,
-        val classes: ClassHierarchy
+        private val context: AnalysisContext,
+        val messages: MessageCollection = context.messages,
+        val classes: ClassHierarchy = context.classes,
+        val classOrigins: Map<String, Set<String>> = context.classOrigins
 ) : Exception("Failed to load class") {
 
     /**

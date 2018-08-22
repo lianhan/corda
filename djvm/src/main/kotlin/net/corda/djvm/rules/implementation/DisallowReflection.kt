@@ -19,6 +19,12 @@ class DisallowReflection : InstructionRule() {
             invalidReflectionUsage(instruction) given ("java/lang/reflect" in instruction.owner)
             invalidReflectionUsage(instruction) given ("java/lang/invoke" in instruction.owner)
         }
+
+        // TODO Extend reflection impact
+//        val pinnedPackagePrefixes = PrefixTree()
+//        for (prefix in Security.getProperty("package.definition").split(",")) {
+//            pinnedPackagePrefixes.add(prefix)
+//        }
     }
 
     private fun RuleContext.invalidReflectionUsage(instruction: MemberAccessInstruction) =

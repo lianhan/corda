@@ -143,27 +143,30 @@ open class SandboxExecutor<in TInput, out TOutput>(
             context: AnalysisContext, classLoader: SandboxClassLoader, classSources: List<ClassSource>
     ): ReferenceValidationSummary {
         processClassQueue(*classSources.toTypedArray()) { classSource, className ->
-            try {
+            val didLoad = try {
                 classLoader.loadClassAndBytes(classSource, context)
+                true
             } catch (exception: SandboxClassLoadingException) {
                 // Continue; all warnings and errors are captured in [context.messages]
+                false
             }
-            context.classes[className]?.apply {
-                context.references.referencesFromLocation(className)
-                        .map { it.reference }
-                        .filterIsInstance<ClassReference>()
-                        .distinct()
-                        .map { ClassSource.fromClassName(it.className, className) }
-                        .forEach { enqueue(it) }
+            if (didLoad) {
+                context.classes[className]?.apply {
+                    context.references.referencesFromLocation(className)
+                            .map { it.reference }
+                            .filterIsInstance<ClassReference>()
+                            .filter { it.className != className }
+                            .distinct()
+                            .map { ClassSource.fromClassName(it.className, className) }
+                            .forEach(::enqueue)
+                }
             }
         }
+        failOnReportedErrorsInContext(context)
 
         // Validate all references in class hierarchy before proceeding.
         referenceValidator.validate(context, classLoader.analyzer)
-
-        if (context.messages.errorCount > 0) {
-            throw SandboxClassLoadingException(context.messages, context.classes)
-        }
+        failOnReportedErrorsInContext(context)
 
         return ReferenceValidationSummary(context.classes, context.messages)
     }
@@ -179,6 +182,20 @@ open class SandboxExecutor<in TInput, out TOutput>(
             if (!whitelist.matches(className)) {
                 action(classSource, className)
             }
+        }
+    }
+
+    /**
+     * Fail if there are reported errors in the current analysis context.
+     */
+    private fun failOnReportedErrorsInContext(context: AnalysisContext) {
+        if (context.messages.errorCount > 0) {
+            for (reference in context.references) {
+                for (location in context.references.locationsFromReference(reference)) {
+                    context.recordClassOrigin(reference.className, location.className)
+                }
+            }
+            throw SandboxClassLoadingException(context)
         }
     }
 

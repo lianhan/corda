@@ -57,6 +57,12 @@ abstract class CommandBase : Callable<Boolean> {
     )
     private var compact: Boolean = false
 
+    @Option(
+            names = ["--print-origins"],
+            description = ["Print origins for errors and warnings."]
+    )
+    private var printOrigins: Boolean = false
+
     private val ansi: Ansi
         get() = when {
             useNoColors -> Ansi.OFF
@@ -117,30 +123,33 @@ abstract class CommandBase : Callable<Boolean> {
                     if (debug) {
                         exception.exception.printStackTrace(System.err)
                     } else {
-                        printError("Error: ${exception.exception.message}")
+                        printError("Error: ${errorMessage(exception.exception)}")
                     }
                     printError()
                 }
             }
         }
-        is StackOverflowError -> {
-            printError("Error: Stack overflow")
-            printError()
-        }
-        is OutOfMemoryError -> {
-            printError("Error: Out of memory")
-            printError()
-        }
         else -> {
             if (debug) {
                 exception.printStackTrace(System.err)
             } else {
-                if (exception.message == null) {
-                    printError("Error: ${exception.javaClass.simpleName}")
-                } else {
-                    printError("Error: ${exception.message}")
-                }
+                printError("Error: ${errorMessage(exception)}")
                 printError()
+            }
+        }
+    }
+
+    private fun errorMessage(exception: Throwable): String {
+        return when (exception) {
+            is StackOverflowError -> "Stack overflow"
+            is OutOfMemoryError -> "Out of memory"
+            is ThreadDeath -> "Thread death"
+            else -> {
+                val message = exception.message
+                when {
+                    message.isNullOrBlank() -> exception.javaClass.simpleName
+                    else -> message!!
+                }
             }
         }
     }
@@ -220,7 +229,7 @@ abstract class CommandBase : Callable<Boolean> {
                     throw Exception("Failed to load whitelist '$it'", exception)
                 }
             }
-        } ?: Whitelist.DETERMINISTIC_RUNTIME
+        } ?: Whitelist.MINIMAL
     }
 
     private fun Int.countOf(suffix: String): String {

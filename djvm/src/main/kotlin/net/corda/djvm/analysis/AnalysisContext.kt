@@ -21,6 +21,23 @@ class AnalysisContext private constructor(
         val inputClasses: List<ClassSource>
 ) {
 
+    private val origins = mutableMapOf<String, MutableSet<String>>()
+
+    /**
+     * Record a class origin in the current analysis context.
+     */
+    fun recordClassOrigin(name: String, origin: String?) {
+        if (origin != null) {
+            origins.getOrPut(name.normalize()) { mutableSetOf() }.add(origin.normalize())
+        }
+    }
+
+    /**
+     * Map of class origins. The resulting set represents the types referencing the class in question.
+     */
+    val classOrigins: Map<String, Set<String>>
+        get() = origins
+
     companion object {
 
         /**
@@ -34,6 +51,11 @@ class AnalysisContext private constructor(
                     classes
             )
         }
+
+        /**
+         * Local extension method for normalizing a class name.
+         */
+        private fun String.normalize() = this.replace("/", ".")
 
     }
 

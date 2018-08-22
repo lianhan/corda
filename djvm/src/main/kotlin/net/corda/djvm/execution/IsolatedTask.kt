@@ -60,7 +60,6 @@ class IsolatedTask(
                         else -> null
                     }
                 }
-                is StackOverflowError, is OutOfMemoryError -> throw it
                 else -> null
             }
         } ?: MessageCollection()

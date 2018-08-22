@@ -34,9 +34,14 @@ class SandboxClassLoader(
         get() = ruleValidator
 
     /**
-     * Set of classes that should be left untouched.
+     * Set of classes that should be left untouched due to pinning.
      */
     private val pinnedClasses = configuration.analysisConfiguration.pinnedClasses
+
+    /**
+     * Set of classes that should be left untouched due to whitelisting.
+     */
+    private val whitelistedClasses = configuration.analysisConfiguration.whitelist
 
     /**
      * Cache of loaded classes.
@@ -108,13 +113,14 @@ class SandboxClassLoader(
                     ByteCode(ByteArray(0), false)
             )
             loadedClasses[name] = pinnedClasses
+            context.recordClassOrigin(name, source.origin)
             return pinnedClasses
         }
 
         // Check if any errors were found during analysis.
         if (context.messages.errorCount > 0) {
             logger.trace("Errors detected after analyzing class {}", source.qualifiedClassName)
-            throw SandboxClassLoadingException(context.messages, context.classes)
+            throw SandboxClassLoadingException(context)
         }
 
         // Transform the class definition and byte code in accordance with provided rules.
@@ -122,14 +128,18 @@ class SandboxClassLoader(
 
         // Try to define the transformed class.
         val clazz = try {
-            defineClass(resolvedName, byteCode.bytes, 0, byteCode.bytes.size)
+            when {
+                whitelistedClasses.matches(qualifiedName) -> supportingClassLoader.loadClass(name)
+                else -> defineClass(resolvedName, byteCode.bytes, 0, byteCode.bytes.size)
+            }
         } catch (exception: SecurityException) {
-            supportingClassLoader.loadClass(name)
+            throw SecurityException("Cannot redefine class '$resolvedName'", exception)
         }
 
         // Cache transformed class.
         val classWithByteCode = LoadedClass(clazz, byteCode)
         loadedClasses[name] = classWithByteCode
+        context.recordClassOrigin(name, source.origin)
 
         logger.trace("Loaded class {}, bytes={}, isModified={}",
                 source.qualifiedClassName, byteCode.bytes.size, byteCode.isModified)
